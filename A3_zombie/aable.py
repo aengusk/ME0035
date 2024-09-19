@@ -1,5 +1,4 @@
-
-# Tufts_ble.py
+# aable.py
 import bluetooth
 import time
 import struct
@@ -15,6 +14,7 @@ class Sniff:
         self._ble.irq(self._irq)
         self.scanning = False 
         self.last = None
+        self.rssi = None
         self.verbose = verbose
         self.discriminator = discriminator
 

@@ -3,6 +3,9 @@ from machine import Pin, I2C
 import Tufts_ble
 import asyncio
 import time # time.ticks_ms() returns the number of miliseconds since the device powered on
+from aable import Sniff
+
+threadsleep = 0.1 # await asyncio.sleep(threadsleep)
 
 class Human:
     def __init__(self):
@@ -16,63 +19,80 @@ class Human:
 
         self.data = {i: dict(self.data_line_template) for i in range(1, 15)}
 
+        self.sniffer = Sniff('!', verbose = False)
+
+        self.led = Pin('GPIO0', Pin.OUT)
+
+    async def control_led(self):
+        while True:
+            if True in [self.data[zombie_number]['is connected'] for zombie_number in self.data.keys()]:
+                self.led.on()
+            else:
+                self.led.off()
+            await asyncio.sleep(threadsleep)
+
+    async def monitor_bluetooth(self):
+        self.sniffer.scan(0)
+        while True:
+            message, rssi = self.sniffer.last, self.sniffer.rssi
+            if message:
+                print(rssi)
+                zombie_number = int(message[1:])
+                threshold = -60
+                if rssi > threshold:
+                    self.data[zombie_number]['is connected'] = True
+                    #print(self.data[zombie_number])
+                else:
+                    self.data[zombie_number]['is connected'] = False
+                self.sniffer.last = self.sniffer.rssi = None
+            else:
+                pass
+                # for i in range(1, 14):
+                #     self.data[i]['is connected'] = False
+            await asyncio.sleep(threadsleep)
+
+    async def print_connections(self):
+        while True:
+            print('is connected: ', self.data[9]['is connected'])
+            await asyncio.sleep(threadsleep)
+
+    async def test(self):
+        testiter = 0
+        while True:
+            testiter += 1
+            await asyncio.sleep(1)
+            print(testiter)
+            await asyncio.sleep(threadsleep)
+
+
+
+
+# human.sniffer.scan(0)
+
+# while True:
+#     message, rssi = human.sniffer.last, human.sniffer.rssi
+#     if message:
+#         print(message)
+#         print(rssi)
+#         human.sniffer.last = human.sniffer.rssi = None
+#     time.sleep(0.1)   
+
     def data_line_as_string(self, line_number):
         to_return = '' # start with an empty string and gradually append data to it
         if line_number == 8 or line_number == 9:
             to_return += ' '
         to_return += str(line_number)
-        # to_return += '!' if self.data[line_number]['is connected'] else ' '
-        to_return += str(self.data[line_number]['connected for']) if self.data[line_number]['is connected'] else '   '
+        to_return += '!' if self.data[line_number]['is connected'] else ' '
+        #to_return += str(self.data[line_number]['connected for']) if self.data[line_number]['is connected'] else '   '
         to_return += 'X' if self.data[line_number]['times infected'] >= 1 else ' '
         to_return += 'X' if self.data[line_number]['times infected'] >= 2 else ' '
         to_return += 'X' if self.data[line_number]['times infected'] >= 3 else ' '
         
-        print(to_return + 'EOL')
+        #print(to_return + 'EOL')
 
         return to_return
     
-    def test_add_data_randomly(self):
-        self.data[4]['is connected'] = True
-        self.data[4]['times infected'] = 2
-        self.data[4]['connected since'] = time.ticks_ms() # not important
-        self.data[4]['connected for'] = 1.3
 
-        self.data[10]['is connected'] = True
-        self.data[10]['times infected'] = 3
-        self.data[10]['connected since'] = time.ticks_ms() # not important
-        self.data[10]['connected for'] = 2.0
-
-    def test_screen(self):
-        self.oled.fill(0)
-        self.oled.text('QMMMMMMMMMMMMMM_', 0, 0)
-        self.oled.text('QMMMMMMMMMMMMMM_', 0, 8)
-        self.oled.text('QMMMMMMMMMMMMMM_', 0, 16)
-        self.oled.text('QMMMMMMMMMMMMMM_', 0, 24)
-        self.oled.text('QMMMMMMMMMMMMMM_', 0, 32)
-        self.oled.text('QMMMMMMMMMMMMMM_', 0, 40)
-        self.oled.text('QMMMMMMMMMMMMMM_', 0, 48)
-        self.oled.text('BMMMMMMMMMMMMMM_', 0, 56)
-        self.oled.show()
-    
-    def test_screen_2(self):
-        self.oled.fill(0)
-        self.oled.text('1234567890\n12345678901234567890', 0, 0)
-        self.oled.show()
-
-    def test_screen_3(self):
-        self.oled.fill(0)
-        self.oled.text('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', 0, 0)
-        self.oled.text('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', 0, 8)
-        self.oled.text('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', 0, 16)
-        self.oled.text('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', 0, 24)
-        self.oled.text('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', 0, 32)
-        self.oled.text('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', 0, 40)
-        self.oled.text('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', 0, 48)
-        self.oled.text('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', 0, 56)
-        self.oled.show()
-
-    def print_data(self):
-        print(self.data)
 
     def display_data(self):
         self.oled.fill(0)
@@ -85,32 +105,17 @@ class Human:
         self.oled.text(self.data_line_as_string( 7) + self.data_line_as_string(14), 0,48)
         self.oled.show()
 
+    async def update_screen(self):
+        while True:
+            self.display_data()
+            await asyncio.sleep(threadsleep)
 
-human = Human()
+async def main():    
+    human = Human()
+    task1 = asyncio.create_task(human.monitor_bluetooth())
+    task2 =  asyncio.create_task(human.update_screen())
+    task3 =  asyncio.create_task(human.test())
+    task4 =  asyncio.create_task(human.control_led())
+    await asyncio.gather(task1, task2, task3, task4)
 
-if True:
-    human.test_add_data_randomly()
-    human.display_data()
-    print(100)
-
-while True: 
-    import time
-from hub import port
-import motor, motor_pair
-from Tufts_ble import Sniff, Yell
-
-def car():
-    motor_pair.unpair(motor_pair.PAIR_1)  # unpair an older pairing if it exists
-    motor_pair.pair(motor_pair.PAIR_1, port.E, port.F)
-    
-    c = Sniff('!', verbose = False)
-    c.scan(0)   # 0ms = scans forever 
-    while True:
-        if c.last:
-            steering = int(c.last[1:])
-            print(steering)
-            motor_pair.move(motor_pair.PAIR_1, steering, velocity=280, acceleration=100) #0 is steering - go straight (-100 to 100)   
-        time.sleep(0.1)
-    motor_pair.stop(motor_pair.PAIR_1)
-    motor_pair.unpair(motor_pair.PAIR_1)  
-    time.sleep(1)
+asyncio.run(main())
