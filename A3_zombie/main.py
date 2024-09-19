@@ -87,6 +87,30 @@ class Human:
 
 
 human = Human()
-human.test_add_data_randomly()
-human.display_data()
-print(100)
+
+if True:
+    human.test_add_data_randomly()
+    human.display_data()
+    print(100)
+
+while True: 
+    import time
+from hub import port
+import motor, motor_pair
+from Tufts_ble import Sniff, Yell
+
+def car():
+    motor_pair.unpair(motor_pair.PAIR_1)  # unpair an older pairing if it exists
+    motor_pair.pair(motor_pair.PAIR_1, port.E, port.F)
+    
+    c = Sniff('!', verbose = False)
+    c.scan(0)   # 0ms = scans forever 
+    while True:
+        if c.last:
+            steering = int(c.last[1:])
+            print(steering)
+            motor_pair.move(motor_pair.PAIR_1, steering, velocity=280, acceleration=100) #0 is steering - go straight (-100 to 100)   
+        time.sleep(0.1)
+    motor_pair.stop(motor_pair.PAIR_1)
+    motor_pair.unpair(motor_pair.PAIR_1)  
+    time.sleep(1)
