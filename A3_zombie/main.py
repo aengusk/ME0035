@@ -1,16 +1,16 @@
 import ssd1306
-from machine import Pin, I2C
+from machine import Pin, I2C, PWM
 import Tufts_ble
 import asyncio
 import time # time.ticks_ms() returns the number of miliseconds since the device powered on
-from aable import Sniff
+from aable import Sniff, Yell
 import neopixel
 
-threadsleep = 0.001 # await asyncio.sleep(threadsleep)
+threadsleep = 0.0 # await asyncio.sleep(threadsleep)
 
 class Human:
     def __init__(self):
-        self.rssi_threshold = -60 # bluetooth yells must be greater than this number to count
+        self.rssi_threshold = -100 # bluetooth yells must be greater than this number to count
         self.forget_threshold = 0.5 # the number of seconds until we call it a new encounter
 
         self.is_human = True
@@ -32,7 +32,11 @@ class Human:
 
         self.led = Pin('GPIO0', Pin.OUT)
         self.all_leds = tuple(Pin('GPIO' + str(i), Pin.OUT) for i in range(6))
+        for led in self.all_leds:
+            led.off()
+
         self.neopixel = neopixel.NeoPixel(Pin(28), 1)  # NeoPixel on GPIO 28
+        self.neopixel[0] = (0, 0, 0); self.neopixel.write()
 
     async def test(self):
         testiter = 0
@@ -52,17 +56,20 @@ class Human:
         while self.is_human:
             message, rssi = self.sniffer.last, self.sniffer.rssi
             if message:
-                print(rssi)
-                zombie_number = int(message[1:])
-                if rssi > self.rssi_threshold:
-                    self.data[zombie_number]['last connected'] = time.ticks_ms()/1000
-                    #print(self.data[zombie_number])
-                # else:
-                #     self.data[zombie_number]['is connected'] = False
-                self.sniffer.last = self.sniffer.rssi = None
-            # else:
-            #     for i in range(1, 14):
-            #         self.data[i]['is connected'] = False
+                # print(rssi)
+                # print(message)
+                try:
+                    zombie_number = int(message[1:])
+                    if 1 <= zombie_number <= 14:
+                        print(zombie_number)
+                        # assert zombie_number in self.data.keys()
+                        # assert 'last connected' in self.data[zombie_number].keys()
+                        if rssi > self.rssi_threshold:
+                            self.data[zombie_number]['last connected'] = time.ticks_ms()/1000
+                    else:
+                        print('zombie number {} was not in [1, 14]'.format(zombie_number))
+                finally:
+                    self.sniffer.last = self.sniffer.rssi = None
             await asyncio.sleep(threadsleep)
 
     async def update_data(self):
@@ -91,7 +98,8 @@ class Human:
                         self.data[z]['just got us'] = True
                         self.data[z]['times infected'] += 1
                         if self.data[z]['times infected'] >= 3:
-                            self.become_zombie()
+                            await asyncio.sleep(0.5)
+                            await self.become_zombie(z)
                 elif self.data[z]['state'] == 2:
                     # self.data[z]['connected for'] = self.data[z]['last connected'] - self.data[z]['connected since'] # I think this is not necessary
                     if time.ticks_ms()/1000 - self.data[z]['last connected'] > self.forget_threshold:
@@ -114,7 +122,12 @@ class Human:
             to_return += ' '
         to_return += str(line_number)
         to_return += '!' if self.data[line_number]['is connected'] else ' '
-        #to_return += str(self.data[line_number]['connected for']) if self.data[line_number]['is connected'] else '   '
+        if self.data[line_number]['is connected']:
+            connected_for_int = int(self.data[line_number]['connected for']*10)
+            connected_for_str = '{:02}'.format(int(connected_for_int))[-2:]
+            to_return += connected_for_str
+        else:
+            to_return += '  '
         to_return += 'X' if self.data[line_number]['times infected'] >= 1 else ' '
         to_return += 'X' if self.data[line_number]['times infected'] >= 2 else ' '
         to_return += 'X' if self.data[line_number]['times infected'] >= 3 else ' '
@@ -135,6 +148,7 @@ class Human:
     async def control_screen(self):
         while self.is_human:
             self.display_data()
+            await asyncio.sleep(0.2)
             await asyncio.sleep(threadsleep)
 
     async def control_led(self):
@@ -145,17 +159,55 @@ class Human:
                 self.led.off()
             await asyncio.sleep(threadsleep)
 
-    def become_zombie(self):
-        self.is_human = False
-        ## more tk, start broadcasting bluetooth
+    async def start_broadcasting(self, zombie_number):
+        flag = True
+        def callback(p):
+            global flag
+            flag = not flag
+        p = Pin('GPIO20', Pin.IN, Pin.PULL_UP)  # guess with PULL_UP does...
+        p.irq(trigger=Pin.IRQ_RISING, handler=callback)
+        
+        p = Yell()
+        buzz = PWM(Pin('GPIO18', Pin.OUT))
+        buzz.freq(440)
+        led = Pin('GPIO0', Pin.OUT)
+        neo = neopixel.NeoPixel(Pin(28), 1)
+        # neo[0] = (0, 255, 0)
+        # neo.write()
+        for i in range(10000):
+            if flag == True:
+                buzz.duty_u16(1000)
+                led.on()
+                neo[0] = (0, 255, 0)
+                neo.write()
+                print(f'advertising !{zombie_number}')
+                p.advertise(f'!{zombie_number}')
+                time.sleep(0.1)
+            elif flag == False:
+                buzz.duty_u16(0)
+                led.off()
+                neo[0] = (0, 0, 0)
+                neo.write()
+                time.sleep(0.1)
+                p.stop_advertising()
+            await asyncio.sleep(threadsleep)
 
-async def main():    
+    async def become_zombie(self, zombie_number):
+        self.is_human = False
+        self.oled.text('NOW ZOMBIE {}'.format(zombie_number), 0, 56)
+        self.oled.show()
+        self.neopixel[0] = (0, 255, 0); self.neopixel.write()
+        for led in self.all_leds:
+            led.on()
+        await self.start_broadcasting(zombie_number)
+
+async def main2():    
     human = Human()
     test = asyncio.create_task(human.test())
     monitor_bluetooth = asyncio.create_task(human.monitor_bluetooth())
     update_data =  asyncio.create_task(human.update_data())
-    print_connections =  asyncio.create_task(human.print_connections())
-    control_screen =  asyncio.create_task(human.control_screen())
+    print_connections = asyncio.create_task(human.print_connections())
+    control_screen = asyncio.create_task(human.control_screen())
     control_led = asyncio.create_task(human.control_led())
     await asyncio.gather(test, 
                          monitor_bluetooth, 
@@ -163,5 +215,15 @@ async def main():
                          print_connections, 
                          control_screen, 
                          control_led)
+
+async def main():
+    human = Human()
+    await asyncio.gather(asyncio.create_task(human.test()), 
+                         asyncio.create_task(human.monitor_bluetooth()), 
+                         asyncio.create_task(human.update_data()), 
+                         asyncio.create_task(human.print_connections()), 
+                         asyncio.create_task(human.control_screen()), 
+                         asyncio.create_task(human.control_led())
+                         )
 
 asyncio.run(main())
