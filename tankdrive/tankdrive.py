@@ -1,4 +1,4 @@
-from machine import Pin, PWM
+from machine import PWM
 
 class Motors:
     '''
@@ -30,7 +30,7 @@ class Motors:
         both arguments must be numbers
         if the numbers are out of range, round them into range
         '''
-        print('about to drive motors with {}, {}'.format(left, right))
+        #print('about to drive motors with {}, {}'.format(left, right))
         assert isinstance(left, float) or isinstance(left, int)
         assert isinstance(right, float) or isinstance(right, int)
         if left < -1:
@@ -41,7 +41,7 @@ class Motors:
             right = -1
         if right > 1:
             right = 1
-        if left == 0: # stop both left ones 
+        if left == 0: # stop both left ones
             self.pwm_LF.duty_u16(0)
             self.pwm_LB.duty_u16(0)
         elif left > 0: # left forward
@@ -60,11 +60,12 @@ class Motors:
             self.pwm_RF.duty_u16(0)
             self.pwm_RB.duty_u16(int(-65535 * right))
 
-    def interpret_throttle_angle(throttle, angle):
+    def interpret_throttle_angle(self, throttle, angle):
+        angle = angle % 360
         if angle == 0:
             return throttle, throttle
-        if 0< angle < 180: 
+        if 0< angle < 180:
             return throttle, throttle*(1-angle/45)
         if 180 < angle:
             return throttle*((angle-315)/45), throttle
-        raise AssertionError('l_r_f_s final block flow reach error')
+        raise AssertionError
