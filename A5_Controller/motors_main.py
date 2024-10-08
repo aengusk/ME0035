@@ -68,3 +68,10 @@ class Motors:
         if 180 < angle:
             return throttle*((angle-315)/45), throttle
         raise AssertionError('l_r_f_s final block flow reach error')
+
+
+
+
+motors = Motors(Pin('P5', Pin.OUT), Pin('P4', Pin.OUT), Pin('P8', Pin.OUT), Pin('P7', Pin.OUT))
+
+motors.drive(*motors.interpret_throttle_angle(1, 0)) # straignt, 0 angle
