@@ -1,3 +1,4 @@
+# tankdrive.py - By: Aengus, Izzy, Tyler - Tue Oct 8 2024
 from machine import PWM
 
 class Motors:
@@ -45,27 +46,30 @@ class Motors:
             self.pwm_LF.duty_u16(0)
             self.pwm_LB.duty_u16(0)
         elif left > 0: # left forward
-            self.pwm_LF.duty_u16(int(65535 * left))
+            self.pwm_LF.duty_u16(int(65535/2 * left))
             self.pwm_LB.duty_u16(0)
         elif left < 0: # left backward
             self.pwm_LF.duty_u16(0)
-            self.pwm_LB.duty_u16(int(-65535 * left))
+            self.pwm_LB.duty_u16(int(-65535/2 * left))
         if right == 0: # stop both right ones
             self.pwm_RF.duty_u16(0)
             self.pwm_RB.duty_u16(0)
         elif right > 0: # right forward
-            self.pwm_RF.duty_u16(int(65535 * right))
+            self.pwm_RF.duty_u16(int(65535/2 * right))
             self.pwm_RB.duty_u16(0)
         elif right < 0: # right backward
             self.pwm_RF.duty_u16(0)
-            self.pwm_RB.duty_u16(int(-65535 * right))
+            self.pwm_RB.duty_u16(int(-65535/2 * right))
 
     def interpret_throttle_angle(self, throttle, angle):
         angle = angle % 360
         if angle == 0:
             return throttle, throttle
         if 0< angle < 180:
-            return throttle, throttle*(1-angle/45)
+            #return throttle, throttle*(1-angle/45)
+            return throttle*(1-angle/45), throttle
         if 180 < angle:
-            return throttle*((angle-315)/45), throttle
+            #return throttle*((angle-315)/45), throttle
+            return throttle, throttle*((angle-315)/45)
+        raise AssertionError
         raise AssertionError
