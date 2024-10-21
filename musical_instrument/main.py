@@ -1,11 +1,12 @@
 # Python
 import time
 import asyncio
+from random import random
 # MicroPython
-from machine import Pin     # type: ignore (suppresses Pylance lint warning)
+from machine import Pin, reset  # type: ignore (suppresses Pylance lint warning)
 # custom
-from mqtt import MQTTClient # type: ignore (suppresses Pylance lint warning)
-from BLE_CEEO import Yell   # type: ignore (suppresses Pylance lint warning)
+from mqtt import MQTTClient     # type: ignore (suppresses Pylance lint warning)
+from BLE_CEEO import Yell       # type: ignore (suppresses Pylance lint warning)
 
 # @todo @bug: bluetooth stops transmitting after 36 chords
 
@@ -51,16 +52,7 @@ class FT:
             print(testiter)
             await asyncio.sleep(threadsleep)
 
-    def send_chord(self, chord, volume = 96):
-        '''
-        chord: a str in chords.keys()
-        '''
-        for note in chords[chord]:
-            self.send_note(note, volume = volume)
-        time.sleep(1)
-
-
-    def send_note(self, note, volume = 96):
+    def send_note(self, note, on = True, volume = 96):
         '''
         note: an integer MIDI note according to 
         https://forum.metasystem.io/forum/metagrid-pro/beta/issues/2981-c-2-c-1-midi-notes-lower-keyboard-range-question
@@ -68,16 +60,36 @@ class FT:
         '''
         channel = 0
         #note = 55
-        cmd = NoteOn
+        if on:
+            cmd = NoteOn
+        else:
+            cmd = NoteOff
 
         channel = 0x0F & channel
         timestamp_ms = time.ticks_ms()
         tsM = (timestamp_ms >> 7 & 0b111111) | 0x80
         tsL =  0x80 | (timestamp_ms & 0b1111111)
 
-        c =  cmd | channel     
+        c =  cmd | channel
         payload = bytes([tsM,tsL,c,note,volume])
         self.yeller.send(payload)
+
+    async def send_chord(self, chord, volume = 96, duration = 0.5):
+        '''
+        chord: a str in chords.keys()
+        duration: can be None or a time in seconds after which to unpress the notes
+        '''
+        print('about to press the chord')
+        for note in chords[chord]:
+            self.send_note(note, on = True, volume = volume)
+
+        
+        if duration is not None:
+            print('about to unpress the chord')
+            await asyncio.sleep(duration)
+            for note in chords[chord]:
+                self.send_note(note, on = False, volume = volume)
+
 
     async def monitor_mqtt(self):
         mqtt_broker = 'broker.hivemq.com' 
@@ -115,54 +127,67 @@ class FT:
                     print('set throttle to 0')
                 else: 
                     print("the message was an unknown string {}".format(msg))
+        print('about to attempt MQTT connection')
+        
         client = MQTTClient('ME35_aengus', mqtt_broker, port, keepalive=60)
         client.set_callback(callback)
         client.connect()
         client.subscribe(topic.encode())
 
+        while True:
+            try:
+                client.check_msg()
+            except OSError:
+                print('OSError WAS RAISED')
+                self.neopixel[0] = (10, 10, 0); self.neopixel.write()
+                reset()
+                # recall self.connect_to_wifi here?
+            await asyncio.sleep(threadsleep)
+
     async def monitor_buttons(self):
         while self.enabled:
             if self.happy:
                 if not self.button0.value():
-                    self.send_chord('C')
+                    print('C was pressed')
+                    await self.send_chord('C')
                 if not self.button1.value():
-                    self.send_chord('Em')
+                    await self.send_chord('Em')
                 if not self.button2.value():
-                    self.send_chord('F')
+                    await self.send_chord('F')
                 if not self.button3.value():
-                    self.send_chord('G')
+                    await self.send_chord('G')
                 if not self.button4.value():
-                    self.send_chord('Am')
+                    await self.send_chord('Am')
             else:
                 if not self.button0.value():
-                    self.send_chord('Cm')
+                    await self.send_chord('Cm')
                 if not self.button1.value():
-                    self.send_chord('Eb')
+                    await self.send_chord('Eb')
                 if not self.button2.value():
-                    self.send_chord('Fm')
+                    await self.send_chord('Fm')
                 if not self.button3.value():
-                    self.send_chord('Gm')
+                    await self.send_chord('Gm')
                 if not self.button4.value():
-                    self.send_chord('Ab')
+                    await self.send_chord('Ab')
             await asyncio.sleep(threadsleep)
     
-    async def hallelujah(self):
-        self.send_chord('C')
-        await asyncio.sleep(1.5)
-        self.send_chord('F')
-        await asyncio.sleep(0.75)
-        self.send_chord('G')
-        await asyncio.sleep(1.5)
-        self.send_chord('Am')
-        await asyncio.sleep(1.5)
-        self.send_chord('F')
-        await asyncio.sleep(1.5)
-        self.send_chord('G')
-        await asyncio.sleep(1.5)
-        self.send_chord('Em')
-        await asyncio.sleep(1.5)
-        self.send_chord('Am')
-        await asyncio.sleep(4.5)
+    # async def hallelujah(self):
+    #     await self.send_chord('C')
+    #     await asyncio.sleep(1.5)
+    #     await self.send_chord('F')
+    #     await asyncio.sleep(0.75)
+    #     await self.send_chord('G')
+    #     await asyncio.sleep(1.5)
+    #     await self.send_chord('Am')
+    #     await asyncio.sleep(1.5)
+    #     await self.send_chord('F')
+    #     await asyncio.sleep(1.5)
+    #     await self.send_chord('G')
+    #     await asyncio.sleep(1.5)
+    #     await self.send_chord('Em')
+    #     await asyncio.sleep(1.5)
+    #     await self.send_chord('Am')
+    #     await asyncio.sleep(4.5)
 
 async def main():
     myft = FT()
