@@ -4,9 +4,11 @@ import asyncio
 from random import random
 # MicroPython
 from machine import Pin, reset  # type: ignore (suppresses Pylance lint warning)
+import network                  # type: ignore (suppresses Pylance lint warning)
 # custom
 from mqtt import MQTTClient     # type: ignore (suppresses Pylance lint warning)
 from BLE_CEEO import Yell       # type: ignore (suppresses Pylance lint warning)
+import secrets                  # type: ignore (suppresses Pylance lint warning)
 
 # @todo @bug: bluetooth stops transmitting after 36 chords
 
@@ -39,10 +41,26 @@ class FT:
         self.button3 = Pin('GPIO3', Pin.IN, Pin.PULL_UP)
         self.button4 = Pin('GPIO4', Pin.IN, Pin.PULL_UP)
         
+        self.connect_to_wifi()
         
         self.yeller = Yell("AengusFT", verbose = True, type = 'midi')
         self.yeller.connect_up()
-        print('just finished connecting up')
+        print('just finished connecting up to Bluetooth')
+
+    def connect_to_wifi(self):
+        #self.neopixel[0] = (10, 0, 10); self.neopixel.write()
+        self.wlan = network.WLAN(network.STA_IF)
+        self.wlan.active(True)
+        self.wlan.connect(secrets.ssid, secrets.password)
+        
+        print('trying to connect to Wi-Fi', end = '')
+        while self.wlan.ifconfig()[0] == '0.0.0.0':
+            print('.', end='')
+            time.sleep(1)
+
+        # We should have a valid IP now via DHCP
+        print('\nWi-Fi connection successful: {}'.format(self.wlan.ifconfig()))
+        #self.neopixel[0] = (10, 0, 0); self.neopixel.write()
 
     async def test(self):
         testiter = 0
@@ -94,39 +112,39 @@ class FT:
     async def monitor_mqtt(self):
         mqtt_broker = 'broker.hivemq.com' 
         port = 1883
-        topic = 'ME35-24/Rex'
+        topic = 'ME35-24/aengus'
 
         def callback(topic, msg):
             topic, msg = topic.decode(), msg.decode()
-            print('received message {}'.format(msg))
+            print('received MQTT message {}'.format(msg))
 
-            try: 
-                msg = eval(msg)
-            except NameError:
-                pass
-            print('the message was of type {}'.format(type(msg)))
-            if isinstance(msg, float) or isinstance(msg, int):
-                self.angle = float(msg)
-                print('set angle to {}'.format(float(msg)))
-            elif isinstance(msg, tuple) and len(msg) == 2:
-                #self.drive_motors(*msg)
-                if msg[0] > msg[1]:
-                    self.throttle = 1.0
-                else:
-                    self.throttle = 0.0
+            # try: 
+            #     msg = eval(msg)
+            # except NameError:
+            #     pass
+            # print('the message was of type {}'.format(type(msg)))
+            # if isinstance(msg, float) or isinstance(msg, int):
+            #     self.angle = float(msg)
+            #     print('set angle to {}'.format(float(msg)))
+            # elif isinstance(msg, tuple) and len(msg) == 2:
+            #     #self.drive_motors(*msg)
+            #     if msg[0] > msg[1]:
+            #         self.throttle = 1.0
+            #     else:
+            #         self.throttle = 0.0
 
-            elif isinstance(msg, str):
-                if msg == 'forward':
-                    self.throttle = 1.0
-                    print('set throttle to 1')
-                elif msg == 'backward':
-                    self.throttle = -1.0
-                    print('set throttle to -1')
-                elif msg == 'stop':
-                    self.throttle = 0.0
-                    print('set throttle to 0')
-                else: 
-                    print("the message was an unknown string {}".format(msg))
+            # elif isinstance(msg, str):
+            #     if msg == 'forward':
+            #         self.throttle = 1.0
+            #         print('set throttle to 1')
+            #     elif msg == 'backward':
+            #         self.throttle = -1.0
+            #         print('set throttle to -1')
+            #     elif msg == 'stop':
+            #         self.throttle = 0.0
+            #         print('set throttle to 0')
+            #     else: 
+            #         print("the message was an unknown string {}".format(msg))
         print('about to attempt MQTT connection')
         
         client = MQTTClient('ME35_aengus', mqtt_broker, port, keepalive=60)
@@ -135,13 +153,14 @@ class FT:
         client.subscribe(topic.encode())
 
         while True:
-            try:
-                client.check_msg()
-            except OSError:
-                print('OSError WAS RAISED')
-                self.neopixel[0] = (10, 10, 0); self.neopixel.write()
-                reset()
-                # recall self.connect_to_wifi here?
+            client.check_msg()
+            # try:
+            #     client.check_msg()
+            # except OSError:
+            #     print('OSError WAS RAISED')
+            #     self.neopixel[0] = (10, 10, 0); self.neopixel.write()
+            #     reset()
+            #     # recall self.connect_to_wifi here?
             await asyncio.sleep(threadsleep)
 
     async def monitor_buttons(self):
@@ -192,7 +211,8 @@ class FT:
 async def main():
     myft = FT()
     await asyncio.gather(asyncio.create_task(myft.test()), 
-                            asyncio.create_task(myft.monitor_buttons())
+                         asyncio.create_task(myft.monitor_buttons()), 
+                         asyncio.create_task(myft.monitor_mqtt())
                         )
     print('MMMMMMMMMMMABOUT TO DISCONNECT')
     myft.yeller.disconnect()
