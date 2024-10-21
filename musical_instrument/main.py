@@ -1,8 +1,11 @@
+# Python
 import time
-from BLE_CEEO import Yell # type: ignore (suppresses Pylance lint warning)
-from machine import Pin # type: ignore (suppresses Pylance lint warning)
 import asyncio
+# MicroPython
+from machine import Pin     # type: ignore (suppresses Pylance lint warning)
+# custom
 from mqtt import MQTTClient # type: ignore (suppresses Pylance lint warning)
+from BLE_CEEO import Yell   # type: ignore (suppresses Pylance lint warning)
 
 # @todo @bug: bluetooth stops transmitting after 36 chords
 

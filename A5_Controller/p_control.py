@@ -1,11 +1,13 @@
 # p_control.py - By: Aengus, Izzy, Tyler - Tue Oct 8 2024
 # To run automatically when cam gets power, rename main.py
 
-from machine import Pin, PWM
-import sensor
+# Python
 import time
 import math
-
+# MicroPython
+from machine import Pin, PWM    # type: ignore (suppresses Pylance lint warning)
+import sensor                   # type: ignore (suppresses Pylance lint warning)
+# custom
 from tankdrive import Motors
 
 motors = Motors(Pin('P4', Pin.OUT), Pin('P5', Pin.OUT), Pin('P8', Pin.OUT), Pin('P7', Pin.OUT))

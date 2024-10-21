@@ -1,7 +1,11 @@
 # aable.py
-import bluetooth
+
+# Python
 import time
 import struct
+# MicroPython
+import bluetooth    # type: ignore (suppresses Pylance lint warning)
+
 
 NAME_FLAG = 0x09
 IRQ_SCAN_RESULT = 5

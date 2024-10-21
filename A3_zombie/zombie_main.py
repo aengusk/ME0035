@@ -1,12 +1,16 @@
+# Python
 import time
-from Tufts_ble import Sniff, Yell
-from machine import Pin, PWM
-import neopixel
+# MicroPython
+from machine import Pin, PWM        # type: ignore (suppresses Pylance lint warning)
+import neopixel                     # type: ignore (suppresses Pylance lint warning)
+# custom
+from Tufts_ble import Sniff, Yell   # type: ignore (suppresses Pylance lint warning)
+
 flag = True
 def callback(p):
     global flag
     flag = not flag
-p = Pin('GPIO20', Pin.IN, machine.Pin.PULL_UP)  # guess with PULL_UP does...
+p = Pin('GPIO20', Pin.IN, Pin.PULL_UP)  # guess with PULL_UP does...
 p.irq(trigger=Pin.IRQ_RISING, handler=callback)
 def peripheral():
     p = Yell()

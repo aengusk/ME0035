@@ -1,5 +1,5 @@
 # tankdrive.py - By: Aengus, Izzy, Tyler - Tue Oct 8 2024
-from machine import PWM
+from machine import PWM  # type: ignore (suppresses Pylance lint warning)
 
 class Motors:
     '''

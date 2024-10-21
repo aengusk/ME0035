@@ -1,11 +1,14 @@
+# Python
 import time
-import network
-from mqtt import MQTTClient
-import secrets
 import asyncio
-from machine import Pin, PWM, reset
-import neopixel
 from random import random
+# MicroPython
+from machine import Pin, PWM, reset # type: ignore (suppresses Pylance lint warning)
+import network                      # type: ignore (suppresses Pylance lint warning)
+import neopixel                     # type: ignore (suppresses Pylance lint warning)
+# custom
+from mqtt import MQTTClient         # type: ignore (suppresses Pylance lint warning)
+import secrets
 
 # The threadsleep config controls the 'await asyncio.sleep(threadsleep)' statement
 # that appears once in each thread's while True loop to yield processor time to the other processes.

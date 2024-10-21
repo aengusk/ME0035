@@ -1,11 +1,14 @@
 # using resources provided by Chris Rogers
 # using syntax reminders, but not entire lines of code, provided by ChatGPT
 
-from machine import Pin, PWM
-import neopixel
+# Python
 import time
 import asyncio
-from mqtt import MQTTClient
+# MicroPython
+from machine import Pin, PWM    # type: ignore (suppresses Pylance lint warning)
+import neopixel                 # type: ignore (suppresses Pylance lint warning)
+# custom
+from mqtt import MQTTClient     # type: ignore (suppresses Pylance lint warning)
 
 # The threadsleep config controls the 'await asyncio.sleep(threadsleep)' statement
 # that appears once in each thread's while True loop to yield processor time to the other processes.

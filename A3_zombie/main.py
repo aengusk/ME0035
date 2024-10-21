@@ -1,10 +1,13 @@
-import ssd1306
-from machine import Pin, I2C, PWM
-import Tufts_ble
+# Python
+import time     # time.ticks_ms() returns the number of miliseconds since the device powered on
 import asyncio
-import time # time.ticks_ms() returns the number of miliseconds since the device powered on
+# MicroPython
+from machine import Pin, I2C, PWM   # type: ignore (suppresses Pylance lint warning)
+import neopixel                     # type: ignore (suppresses Pylance lint warning)
+# custom
+import ssd1306
 from aable import Sniff, Yell
-import neopixel
+
 
 threadsleep = 0.0 # await asyncio.sleep(threadsleep)
 

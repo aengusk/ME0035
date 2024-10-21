@@ -1,12 +1,11 @@
-
-#Imports
+# Python
 import time
-import network
-import sensor
 import math
-from mqtt import MQTTClient
-
-
+# MicroPython
+import network              # type: ignore (suppresses Pylance lint warning)
+import sensor               # type: ignore (suppresses Pylance lint warning)
+# custom
+from mqtt import MQTTClient # type: ignore (suppresses Pylance lint warning)
 
 #Reset Sensor settings
 sensor.reset()
