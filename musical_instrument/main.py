@@ -2,6 +2,9 @@ import time
 from BLE_CEEO import Yell # type: ignore (suppresses Pylance lint warning)
 from machine import Pin # type: ignore (suppresses Pylance lint warning)
 import asyncio
+from mqtt import MQTTClient # type: ignore (suppresses Pylance lint warning)
+
+# @todo @bug: bluetooth stops transmitting after 36 chords
 
 NoteOn = 0x90
 NoteOff = 0x80
@@ -26,11 +29,11 @@ class FT:
         self.enabled = True
         self.happy = True
         
-        self.button0 = Pin('GPIO10', Pin.IN, Pin.PULL_UP)
-        self.button1 = Pin('GPIO11', Pin.IN, Pin.PULL_UP)
-        self.button2 = Pin('GPIO12', Pin.IN, Pin.PULL_UP)
-        self.button3 = Pin('GPIO13', Pin.IN, Pin.PULL_UP)
-        self.button4 = Pin('GPIO14', Pin.IN, Pin.PULL_UP)
+        self.button0 = Pin('GPIO0', Pin.IN, Pin.PULL_UP)
+        self.button1 = Pin('GPIO1', Pin.IN, Pin.PULL_UP)
+        self.button2 = Pin('GPIO2', Pin.IN, Pin.PULL_UP)
+        self.button3 = Pin('GPIO3', Pin.IN, Pin.PULL_UP)
+        self.button4 = Pin('GPIO4', Pin.IN, Pin.PULL_UP)
         
         
         self.yeller = Yell("AengusFT", verbose = True, type = 'midi')
@@ -51,6 +54,7 @@ class FT:
         '''
         for note in chords[chord]:
             self.send_note(note, volume = volume)
+        time.sleep(1)
 
 
     def send_note(self, note, volume = 96):
@@ -71,6 +75,47 @@ class FT:
         c =  cmd | channel     
         payload = bytes([tsM,tsL,c,note,volume])
         self.yeller.send(payload)
+
+    async def monitor_mqtt(self):
+        mqtt_broker = 'broker.hivemq.com' 
+        port = 1883
+        topic = 'ME35-24/Rex'
+
+        def callback(topic, msg):
+            topic, msg = topic.decode(), msg.decode()
+            print('received message {}'.format(msg))
+
+            try: 
+                msg = eval(msg)
+            except NameError:
+                pass
+            print('the message was of type {}'.format(type(msg)))
+            if isinstance(msg, float) or isinstance(msg, int):
+                self.angle = float(msg)
+                print('set angle to {}'.format(float(msg)))
+            elif isinstance(msg, tuple) and len(msg) == 2:
+                #self.drive_motors(*msg)
+                if msg[0] > msg[1]:
+                    self.throttle = 1.0
+                else:
+                    self.throttle = 0.0
+
+            elif isinstance(msg, str):
+                if msg == 'forward':
+                    self.throttle = 1.0
+                    print('set throttle to 1')
+                elif msg == 'backward':
+                    self.throttle = -1.0
+                    print('set throttle to -1')
+                elif msg == 'stop':
+                    self.throttle = 0.0
+                    print('set throttle to 0')
+                else: 
+                    print("the message was an unknown string {}".format(msg))
+        client = MQTTClient('ME35_aengus', mqtt_broker, port, keepalive=60)
+        client.set_callback(callback)
+        client.connect()
+        client.subscribe(topic.encode())
 
     async def monitor_buttons(self):
         while self.enabled:
