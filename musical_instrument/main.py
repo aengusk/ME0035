@@ -10,8 +10,6 @@ from mqtt import MQTTClient     # type: ignore (suppresses Pylance lint warning)
 from BLE_CEEO import Yell       # type: ignore (suppresses Pylance lint warning)
 import secrets                  # type: ignore (suppresses Pylance lint warning)
 
-# @todo @bug: bluetooth stops transmitting after 36 chords
-
 NoteOn = 0x90
 NoteOff = 0x80
 StopNotes = 123
@@ -35,13 +33,15 @@ class FT:
         self.enabled = True
         self.happy = True
         
+        self.button = Pin('GPIO20', Pin.IN, Pin.PULL_UP)
+
         self.button0 = Pin('GPIO0', Pin.IN, Pin.PULL_UP)
         self.button1 = Pin('GPIO1', Pin.IN, Pin.PULL_UP)
         self.button2 = Pin('GPIO2', Pin.IN, Pin.PULL_UP)
         self.button3 = Pin('GPIO3', Pin.IN, Pin.PULL_UP)
         self.button4 = Pin('GPIO4', Pin.IN, Pin.PULL_UP)
         
-        self.connect_to_wifi()
+        #self.connect_to_wifi()
         
         self.yeller = Yell("AengusFT", verbose = True, type = 'midi')
         self.yeller.connect_up()
@@ -68,6 +68,14 @@ class FT:
             testiter += 1
             await asyncio.sleep(1)
             print(testiter)
+            await asyncio.sleep(threadsleep)
+
+    async def monitor_mqtt_button(self):
+        while True:
+            if not self.button.value():
+                self.happy = not self.happy
+                print(f'self.happy is now {self.happy}')
+                await asyncio.sleep(0.5)
             await asyncio.sleep(threadsleep)
 
     def send_note(self, note, on = True, volume = 96):
@@ -110,7 +118,7 @@ class FT:
 
 
     async def monitor_mqtt(self):
-        mqtt_broker = 'broker.hivemq.com' 
+        mqtt_broker = 'broker.hivemq.com' # or 'broker.emqx.io'
         port = 1883
         topic = 'ME35-24/aengus'
 
@@ -163,7 +171,7 @@ class FT:
             #     # recall self.connect_to_wifi here?
             await asyncio.sleep(threadsleep)
 
-    async def monitor_buttons(self):
+    async def monitor_chord_buttons(self):
         while self.enabled:
             if self.happy:
                 if not self.button0.value():
@@ -211,8 +219,9 @@ class FT:
 async def main():
     myft = FT()
     await asyncio.gather(asyncio.create_task(myft.test()), 
-                         asyncio.create_task(myft.monitor_buttons()), 
-                         asyncio.create_task(myft.monitor_mqtt())
+                         asyncio.create_task(myft.monitor_mqtt_button()),
+                         #asyncio.create_task(myft.monitor_mqtt()),
+                         asyncio.create_task(myft.monitor_chord_buttons())
                         )
     print('MMMMMMMMMMMABOUT TO DISCONNECT')
     myft.yeller.disconnect()
