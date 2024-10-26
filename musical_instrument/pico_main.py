@@ -42,7 +42,7 @@ class FT:
         self.button3 = Pin('GPIO3', Pin.IN, Pin.PULL_UP)
         self.button4 = Pin('GPIO4', Pin.IN, Pin.PULL_UP)
         
-        #self.connect_to_wifi()
+        self.connect_to_wifi()
         
         self.yeller = Yell("AengusFT", verbose = True, type = 'midi')
         self.yeller.connect_up()
@@ -119,57 +119,33 @@ class FT:
 
 
     async def monitor_mqtt(self):
-        mqtt_broker = 'broker.hivemq.com' # or 'broker.emqx.io'
+        mqtt_broker = 'broker.hivemq.com' # old
+        # mqtt_broker = 'broker.emqx.io' # new
         port = 1883
         topic = 'ME35-24/aengus'
 
         def callback(topic, msg):
             topic, msg = topic.decode(), msg.decode()
             print('received MQTT message {}'.format(msg))
+            if msg == 'happy':
+                self.happy = True
+            elif msg == 'sad':
+                self.happy = False
+            elif msg == 'enable':
+                self.enabled = True
+            elif msg == False:
+                self.enabled = False
+            
 
-            # try: 
-            #     msg = eval(msg)
-            # except NameError:
-            #     pass
-            # print('the message was of type {}'.format(type(msg)))
-            # if isinstance(msg, float) or isinstance(msg, int):
-            #     self.angle = float(msg)
-            #     print('set angle to {}'.format(float(msg)))
-            # elif isinstance(msg, tuple) and len(msg) == 2:
-            #     #self.drive_motors(*msg)
-            #     if msg[0] > msg[1]:
-            #         self.throttle = 1.0
-            #     else:
-            #         self.throttle = 0.0
-
-            # elif isinstance(msg, str):
-            #     if msg == 'forward':
-            #         self.throttle = 1.0
-            #         print('set throttle to 1')
-            #     elif msg == 'backward':
-            #         self.throttle = -1.0
-            #         print('set throttle to -1')
-            #     elif msg == 'stop':
-            #         self.throttle = 0.0
-            #         print('set throttle to 0')
-            #     else: 
-            #         print("the message was an unknown string {}".format(msg))
         print('about to attempt MQTT connection')
         
-        client = MQTTClient('ME35_aengus', mqtt_broker, port, keepalive=60)
-        client.set_callback(callback)
-        client.connect()
-        client.subscribe(topic.encode())
+        self.client = MQTTClient('ME35_aengus', mqtt_broker, port, keepalive=60)
+        self.client.set_callback(callback)
+        self.client.connect()
+        self.client.subscribe(topic.encode())
 
         while True:
-            client.check_msg()
-            # try:
-            #     client.check_msg()
-            # except OSError:
-            #     print('OSError WAS RAISED')
-            #     self.neopixel[0] = (10, 10, 0); self.neopixel.write()
-            #     reset()
-            #     # recall self.connect_to_wifi here?
+            self.client.check_msg()
             await asyncio.sleep(threadsleep)
 
     async def monitor_chord_buttons(self):
@@ -202,16 +178,28 @@ class FT:
     
     async def monitor_photoresistor(self):
         while True:
-            darkness_value = self.photoresistor.read_u16()
-            # observed behavior:
-            # the value is low when uncovered (between 128 and 192)
-            # the value is higher when covered (between 592 and 800)
-            print('DARKNESS VALUE: {}'.format(darkness_value))
-            if darkness_value > 15000:
-                self.enabled = False
-            else:
-                self.enabled = True
-            await asyncio.sleep(1)
+            try:
+                await asyncio.sleep(1)
+                darkness_value = self.photoresistor.read_u16()
+                # observed behavior:
+                # the value is low when uncovered (between 128 and 192)
+                # the value is higher when covered (between 592 and 800)
+                print('DARKNESS VALUE: {}'.format(darkness_value))
+                if darkness_value > 500:
+                    self.enabled = False
+                    topic = 'ME35-24/aengus'
+                    msg = 'disable'
+                    self.client.publish(topic.encode(), msg.encode())
+                    print('just published disable')
+                else:
+                    self.enabled = True
+                    topic = 'ME35-24/aengus'
+                    msg = 'enable'
+                    print('about to try to publish "enable"')
+                    self.client.publish(topic.encode(), msg.encode())
+                    print('just published enable')
+            except AttributeError:
+                print('AttributeError')
             await asyncio.sleep(threadsleep)
 
     # async def hallelujah(self):
@@ -236,7 +224,7 @@ async def main():
     myft = FT()
     await asyncio.gather(asyncio.create_task(myft.test()), 
                          asyncio.create_task(myft.monitor_mqtt_button()),
-                         #asyncio.create_task(myft.monitor_mqtt()),
+                         asyncio.create_task(myft.monitor_mqtt()),
                          asyncio.create_task(myft.monitor_chord_buttons()), 
                          asyncio.create_task(myft.monitor_photoresistor())
                         )

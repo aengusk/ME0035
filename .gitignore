@@ -3,4 +3,6 @@ secrets.py
 /A3_zombie/test.py
 /A3_zombie/trash.py
 /external_libraries/
+/musical_instrument/pico_nomqtt_main.py
+/musical_instrument/dahal_nomqtt_main.py
 __pycache__/

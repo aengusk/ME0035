@@ -5,8 +5,8 @@ import asyncio
 from machine import Pin, I2C, PWM   # type: ignore (suppresses Pylance lint warning)
 import neopixel                     # type: ignore (suppresses Pylance lint warning)
 # custom
-import ssd1306
-from aable import Sniff, Yell
+import ssd1306                      # type: ignore (suppresses Pylance lint warning)
+from aable import Sniff, Yell       # type: ignore (suppresses Pylance lint warning)
 
 
 threadsleep = 0.0 # await asyncio.sleep(threadsleep)
