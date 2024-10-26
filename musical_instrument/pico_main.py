@@ -1,14 +1,13 @@
 # Python
 import time
 import asyncio
-from random import random
 # MicroPython
-from machine import Pin, reset  # type: ignore (suppresses Pylance lint warning)
-import network                  # type: ignore (suppresses Pylance lint warning)
+from machine import Pin, ADC, reset # type: ignore (suppresses Pylance lint warning)
+import network                      # type: ignore (suppresses Pylance lint warning)
 # custom
-from mqtt import MQTTClient     # type: ignore (suppresses Pylance lint warning)
-from BLE_CEEO import Yell       # type: ignore (suppresses Pylance lint warning)
-import secrets                  # type: ignore (suppresses Pylance lint warning)
+from mqtt import MQTTClient         # type: ignore (suppresses Pylance lint warning)
+from BLE_CEEO import Yell           # type: ignore (suppresses Pylance lint warning)
+import secrets                      # type: ignore (suppresses Pylance lint warning)
 
 NoteOn = 0x90
 NoteOff = 0x80
@@ -34,6 +33,8 @@ class FT:
         self.happy = True
         
         self.button = Pin('GPIO20', Pin.IN, Pin.PULL_UP)
+
+        self.photoresistor = ADC(Pin('GPIO27', Pin.PULL_UP))
 
         self.button0 = Pin('GPIO0', Pin.IN, Pin.PULL_UP)
         self.button1 = Pin('GPIO1', Pin.IN, Pin.PULL_UP)
@@ -172,32 +173,47 @@ class FT:
             await asyncio.sleep(threadsleep)
 
     async def monitor_chord_buttons(self):
-        while self.enabled:
-            if self.happy:
-                if not self.button0.value():
-                    print('C was pressed')
-                    await self.send_chord('C')
-                if not self.button1.value():
-                    await self.send_chord('Em')
-                if not self.button2.value():
-                    await self.send_chord('F')
-                if not self.button3.value():
-                    await self.send_chord('G')
-                if not self.button4.value():
-                    await self.send_chord('Am')
-            else:
-                if not self.button0.value():
-                    await self.send_chord('Cm')
-                if not self.button1.value():
-                    await self.send_chord('Eb')
-                if not self.button2.value():
-                    await self.send_chord('Fm')
-                if not self.button3.value():
-                    await self.send_chord('Gm')
-                if not self.button4.value():
-                    await self.send_chord('Ab')
+        while True:
+            if self.enabled:
+                if self.happy:
+                    if not self.button0.value():
+                        print('C was pressed')
+                        await self.send_chord('C')
+                    if not self.button1.value():
+                        await self.send_chord('Em')
+                    if not self.button2.value():
+                        await self.send_chord('F')
+                    if not self.button3.value():
+                        await self.send_chord('G')
+                    if not self.button4.value():
+                        await self.send_chord('Am')
+                else:
+                    if not self.button0.value():
+                        await self.send_chord('Cm')
+                    if not self.button1.value():
+                        await self.send_chord('Eb')
+                    if not self.button2.value():
+                        await self.send_chord('Fm')
+                    if not self.button3.value():
+                        await self.send_chord('Gm')
+                    if not self.button4.value():
+                        await self.send_chord('Ab')
             await asyncio.sleep(threadsleep)
     
+    async def monitor_photoresistor(self):
+        while True:
+            darkness_value = self.photoresistor.read_u16()
+            # observed behavior:
+            # the value is low when uncovered (between 128 and 192)
+            # the value is higher when covered (between 592 and 800)
+            print('DARKNESS VALUE: {}'.format(darkness_value))
+            if darkness_value > 15000:
+                self.enabled = False
+            else:
+                self.enabled = True
+            await asyncio.sleep(1)
+            await asyncio.sleep(threadsleep)
+
     # async def hallelujah(self):
     #     await self.send_chord('C')
     #     await asyncio.sleep(1.5)
@@ -221,7 +237,8 @@ async def main():
     await asyncio.gather(asyncio.create_task(myft.test()), 
                          asyncio.create_task(myft.monitor_mqtt_button()),
                          #asyncio.create_task(myft.monitor_mqtt()),
-                         asyncio.create_task(myft.monitor_chord_buttons())
+                         asyncio.create_task(myft.monitor_chord_buttons()), 
+                         asyncio.create_task(myft.monitor_photoresistor())
                         )
     print('MMMMMMMMMMMABOUT TO DISCONNECT')
     myft.yeller.disconnect()
